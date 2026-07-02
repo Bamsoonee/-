@@ -45,11 +45,6 @@
   }
   input:focus{outline:2px solid var(--accent); outline-offset:0; border-color:var(--accent);}
 
-  .segment{display:flex; border:1px solid var(--line); border-radius:7px; overflow:hidden; margin-bottom:12px;}
-  .segment button{
-    flex:1; padding:8px 0; border:0; background:#fff; font-size:13px; cursor:pointer; color:var(--sub); font-family:inherit;
-  }
-  .segment button.on{background:var(--accent); color:#fff; font-weight:700;}
   .hint{font-size:11.5px; color:var(--sub); margin-top:2px; line-height:1.45;}
 
   /* 달력 */
@@ -65,7 +60,7 @@
   table.cal th.sun{color:var(--sun);} table.cal th.sat{color:var(--sat);}
   table.cal td{padding:2px;}
   .day{
-    width:100%; aspect-ratio:1.35; border:1px solid transparent; border-radius:8px;
+    width:100%; aspect-ratio:1.25; border:1px solid transparent; border-radius:8px;
     background:transparent; cursor:pointer; font-size:13.5px; font-family:var(--num);
     color:var(--ink); position:relative;
   }
@@ -74,7 +69,7 @@
   .day.sun{color:var(--sun);} .day.sat{color:var(--sat);}
   .day.other.sun, .day.other.sat{opacity:.45;}
   .day.sel{background:var(--accent); color:#fff !important; font-weight:700;}
-  .day.sel::after{content:'근무'; display:block; font-size:9px; font-weight:500; opacity:.85;}
+  .day .sub{display:block; font-size:9px; font-weight:500; opacity:.85; line-height:1.2;}
   .cal-note{font-size:11.5px; color:var(--sub); margin-top:10px;}
   .cal-actions{display:flex; gap:8px; margin-top:10px;}
   .btn-sm{
@@ -82,6 +77,25 @@
     font-size:12px; cursor:pointer; color:var(--ink); font-family:inherit;
   }
   .btn-sm:hover{border-color:var(--accent); color:var(--accent);}
+
+  /* 근무일별 상세 */
+  table.dt{width:100%; border-collapse:collapse; font-family:var(--num);}
+  table.dt th{
+    font-size:11.5px; color:var(--sub); font-weight:600; text-align:left;
+    padding:6px 8px; border-bottom:1.5px solid var(--ink);
+  }
+  table.dt td{padding:5px 8px; border-bottom:1px solid var(--line); font-size:13px; white-space:nowrap;}
+  table.dt input{
+    width:100px; padding:5px 8px; font-size:13px; text-align:right;
+    border:1px solid var(--line); border-radius:6px; font-family:var(--num);
+  }
+  table.dt input.mod{border-color:var(--accent); background:var(--accent-soft); font-weight:700;}
+  table.dt .del{
+    border:0; background:none; cursor:pointer; color:var(--sub); font-size:14px; padding:2px 6px;
+  }
+  table.dt .del:hover{color:var(--warn);}
+  .dt-date .dow{font-size:11px; color:var(--sub); margin-left:4px;}
+  .dt-date .dow.sun{color:var(--sun);} .dt-date .dow.sat{color:var(--sat);}
 
   /* 주별 테이블 */
   table.wk{width:100%; border-collapse:collapse; font-family:var(--num);}
@@ -144,24 +158,25 @@
     <!-- ── 왼쪽: 설정 ── -->
     <div>
       <div class="panel" id="settings">
-        <h2>임금 조건</h2>
-        <div class="segment" id="wageMode">
-          <button data-m="daily" class="on">일당 입력</button>
-          <button data-m="hourly">시급 입력</button>
-        </div>
-        <div class="row" id="dailyRow">
-          <label>1일 일당 (원)</label>
+        <h2>기본 임금 조건</h2>
+        <div class="row">
+          <label>기본 일당 (원)</label>
           <input type="number" id="dailyWage" value="150000" step="1000" min="0">
         </div>
-        <div class="row" id="hourlyRow" style="display:none">
-          <label>시급 (원)</label>
-          <input type="number" id="hourlyWage" value="12000" step="100" min="0">
-        </div>
         <div class="row">
-          <label>1일 소정근로시간 (시간)</label>
+          <label>기본 1일 근로시간 (시간)</label>
           <input type="number" id="dailyHours" value="8" step="0.5" min="0" max="24">
-          <div class="hint">주휴수당 = min(주 근로시간, 40) ÷ 40 × 8 × 시급<br>주 15시간 미만인 주는 자동 제외됩니다.</div>
+          <div class="hint">근무일 클릭 시 이 값으로 추가됩니다.<br>날짜별로 다르면 아래 <b>근무일별 상세</b>에서 개별 수정하세요. 이미 추가된 날짜에는 기본값 변경이 소급되지 않습니다.</div>
         </div>
+      </div>
+
+      <div class="panel">
+        <h2>근무일별 상세</h2>
+        <table class="dt">
+          <thead><tr><th>날짜</th><th style="text-align:right">일당</th><th style="text-align:right">시간</th><th></th></tr></thead>
+          <tbody id="dtBody"></tbody>
+        </table>
+        <div class="hint" style="margin-top:8px">기본값과 다르게 수정한 칸은 <span style="color:var(--accent);font-weight:700">초록</span>으로 표시됩니다.</div>
       </div>
     </div>
 
@@ -214,13 +229,17 @@
   var state = {
     year: new Date().getFullYear(),
     month: new Date().getMonth(),
-    selected: {},
-    excludedWeeks: {},
-    wageMode: 'daily'
+    // 'YYYY-MM-DD' -> { w: 일당, h: 시간 }
+    days: {},
+    excludedWeeks: {}
   };
 
   var $ = function(id){ return document.getElementById(id); };
   var fmt = function(n){ return Math.round(n).toLocaleString('ko-KR'); };
+  var DOW = ['일','월','화','수','목','금','토'];
+
+  function defW(){ return parseFloat($('dailyWage').value) || 0; }
+  function defH(){ return parseFloat($('dailyHours').value) || 8; }
 
   function iso(d){
     return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
@@ -235,20 +254,6 @@
     var m = new Date(d);
     m.setDate(d.getDate() + diff);
     return m;
-  }
-
-  function hourly(){
-    var h = parseFloat($('dailyHours').value) || 8;
-    if(state.wageMode === 'daily'){
-      var dw = parseFloat($('dailyWage').value) || 0;
-      return h > 0 ? dw / h : 0;
-    }
-    return parseFloat($('hourlyWage').value) || 0;
-  }
-  function dailyWage(){
-    var h = parseFloat($('dailyHours').value) || 8;
-    if(state.wageMode === 'daily') return parseFloat($('dailyWage').value) || 0;
-    return (parseFloat($('hourlyWage').value) || 0) * h;
   }
 
   /* ── 달력 렌더 ── */
@@ -270,8 +275,16 @@
         if(!inMonth) cls += ' other';
         if(cur.getDay() === 0) cls += ' sun';
         if(cur.getDay() === 6) cls += ' sat';
-        if(state.selected[key]) cls += ' sel';
-        cells += '<td><button class="'+cls+'" data-d="'+key+'">'+cur.getDate()+'</button></td>';
+        var sub = '';
+        if(state.days[key]){
+          cls += ' sel';
+          var d0 = state.days[key];
+          // 기본값과 다르면 금액 표시, 같으면 '근무'
+          sub = (d0.w !== defW() || d0.h !== defH())
+            ? '<span class="sub">' + (d0.w/10000) + '만·' + d0.h + 'h</span>'
+            : '<span class="sub">근무</span>';
+        }
+        cells += '<td><button class="'+cls+'" data-d="'+key+'">'+cur.getDate()+sub+'</button></td>';
         cur.setDate(cur.getDate()+1);
       }
       row += cells + '</tr>';
@@ -282,21 +295,60 @@
     for(var j=0; j<btns.length; j++){
       btns[j].addEventListener('click', function(){
         var k = this.getAttribute('data-d');
-        if(state.selected[k]) delete state.selected[k];
-        else state.selected[k] = true;
-        renderCal(); calc();
+        if(state.days[k]) delete state.days[k];
+        else state.days[k] = { w: defW(), h: defH() };
+        renderAll();
+      });
+    }
+  }
+
+  /* ── 근무일별 상세 렌더 ── */
+  function renderDetail(){
+    var keys = Object.keys(state.days).sort();
+    var html = '';
+    keys.forEach(function(k){
+      var d = fromIso(k);
+      var dd = state.days[k];
+      var dowCls = d.getDay() === 0 ? 'sun' : (d.getDay() === 6 ? 'sat' : '');
+      var wMod = dd.w !== defW() ? ' mod' : '';
+      var hMod = dd.h !== defH() ? ' mod' : '';
+      html += '<tr>'
+        + '<td class="dt-date">' + (d.getMonth()+1) + '/' + d.getDate()
+        + '<span class="dow '+dowCls+'">(' + DOW[d.getDay()] + ')</span></td>'
+        + '<td style="text-align:right"><input type="number" class="dt-w'+wMod+'" data-d="'+k+'" value="'+dd.w+'" step="1000" min="0"></td>'
+        + '<td style="text-align:right"><input type="number" class="dt-h'+hMod+'" data-d="'+k+'" value="'+dd.h+'" step="0.5" min="0" max="24" style="width:60px"></td>'
+        + '<td><button class="del" data-d="'+k+'" title="삭제">✕</button></td>'
+        + '</tr>';
+    });
+    $('dtBody').innerHTML = html || '<tr><td colspan="4" style="text-align:center;color:var(--sub);padding:14px">근무일이 없습니다</td></tr>';
+
+    var ws = $('dtBody').querySelectorAll('.dt-w');
+    for(var i=0; i<ws.length; i++){
+      ws[i].addEventListener('change', function(){
+        state.days[this.getAttribute('data-d')].w = parseFloat(this.value) || 0;
+        renderAll();
+      });
+    }
+    var hs = $('dtBody').querySelectorAll('.dt-h');
+    for(var i2=0; i2<hs.length; i2++){
+      hs[i2].addEventListener('change', function(){
+        state.days[this.getAttribute('data-d')].h = parseFloat(this.value) || 0;
+        renderAll();
+      });
+    }
+    var dels = $('dtBody').querySelectorAll('.del');
+    for(var i3=0; i3<dels.length; i3++){
+      dels[i3].addEventListener('click', function(){
+        delete state.days[this.getAttribute('data-d')];
+        renderAll();
       });
     }
   }
 
   /* ── 계산 ── */
   function calc(){
-    var hrs = parseFloat($('dailyHours').value) || 8;
-    var hw = hourly();
-    var dw = dailyWage();
-
     var weeks = {};
-    var dates = Object.keys(state.selected).sort();
+    var dates = Object.keys(state.days).sort();
     dates.forEach(function(k){
       var d = fromIso(k);
       var wk = iso(mondayOf(d));
@@ -310,35 +362,44 @@
 
     var curY = state.year, curM = state.month;
     function inCurMonth(d){ return d.getFullYear() === curY && d.getMonth() === curM; }
-    function monthDaysCount(days){
-      return days.filter(function(k){ return inCurMonth(fromIso(k)); }).length;
-    }
 
     wkKeys.forEach(function(wk){
       var days = weeks[wk];
       var mon = fromIso(wk);
       var sun = new Date(mon); sun.setDate(mon.getDate()+6);
-      var weekHours = days.length * hrs;
+
+      var weekHours = 0, weekWage = 0;
+      days.forEach(function(k){
+        weekHours += state.days[k].h;
+        weekWage += state.days[k].w;
+      });
+      // 주 평균 시급 = 주 임금 합계 ÷ 주 근로시간 합계
+      var avgHourly = weekHours > 0 ? weekWage / weekHours : 0;
+
       var eligible = weekHours >= 15;
       var excluded = !!state.excludedWeeks[wk];
       var juhyu = 0;
       if(eligible && !excluded){
-        juhyu = Math.round(Math.min(weekHours, 40) / 40 * 8 * hw);
+        juhyu = Math.round(Math.min(weekHours, 40) / 40 * 8 * avgHourly);
       }
       var juhyuBelongs = inCurMonth(sun);
-      var mCount = monthDaysCount(days);
-      var wage = mCount * dw;
 
-      totWage += wage;
+      var mWage = 0, mCount = 0;
+      days.forEach(function(k){
+        if(inCurMonth(fromIso(k))){ mWage += state.days[k].w; mCount++; }
+      });
+
+      totWage += mWage;
       if(juhyuBelongs) totJuhyu += juhyu;
 
       var range = (mon.getMonth()+1)+'/'+mon.getDate()+' ~ '+(sun.getMonth()+1)+'/'+sun.getDate();
+      var hoursDisp = Math.round(weekHours*100)/100;
       rows += '<tr>'
         + '<td><span class="wkrange">'+range+'</span></td>'
         + '<td>'+days.length+'일</td>'
-        + '<td>'+weekHours+'h</td>'
+        + '<td>'+hoursDisp+'h</td>'
         + '<td>'+(eligible ? '<span class="badge ok">15h 이상</span>' : '<span class="badge no">15h 미만</span>')+'</td>'
-        + '<td>'+fmt(wage)+(days.length !== mCount ? ' <span class="wkrange">(당월분)</span>' : '')+'</td>'
+        + '<td>'+fmt(mWage)+(days.length !== mCount ? ' <span class="wkrange">(당월분)</span>' : '')+'</td>'
         + '<td class="'+(excluded?'excl':'')+'">'+ (eligible ? fmt(juhyu)+(juhyuBelongs?'':' <span class="wkrange">(익월귀속)</span>') : '—') +'</td>'
         + '<td><input type="checkbox" class="wk-toggle" data-wk="'+wk+'" '+(excluded?'':'checked')+' '+(eligible?'':'disabled')+'></td>'
         + '</tr>';
@@ -366,7 +427,7 @@
     $('sumArea').innerHTML = s;
 
     $('taxDetail').innerHTML =
-      '<b>주휴수당</b> : min(주 근로시간, 40) ÷ 40 × 8 × 시급 ' + fmt(hw) + '원 · 주 15시간 미만 주 제외 · 일요일 기준 당월 귀속';
+      '<b>주휴수당</b> : min(주 근로시간, 40) ÷ 40 × 8 × 주 평균 시급(주 임금합 ÷ 주 시간합) · 주 15시간 미만 주 제외 · 일요일 기준 당월 귀속';
 
     state.copyText = [
       '[' + state.year + '년 ' + (state.month+1) + '월 일용직 급여]',
@@ -381,43 +442,37 @@
     return '<div class="card"><div class="k">'+k+'</div><div class="v">'+v+'</div></div>';
   }
 
+  function renderAll(){
+    renderCal(); renderDetail(); calc();
+  }
+
   /* ── 이벤트 ── */
   $('prevM').addEventListener('click', function(){
     state.month--; if(state.month < 0){ state.month = 11; state.year--; }
-    renderCal(); calc();
+    renderAll();
   });
   $('nextM').addEventListener('click', function(){
     state.month++; if(state.month > 11){ state.month = 0; state.year++; }
-    renderCal(); calc();
+    renderAll();
   });
   $('selWeekdays').addEventListener('click', function(){
     var last = new Date(state.year, state.month+1, 0).getDate();
     for(var d=1; d<=last; d++){
       var dt = new Date(state.year, state.month, d);
-      if(dt.getDay() !== 0 && dt.getDay() !== 6) state.selected[iso(dt)] = true;
+      if(dt.getDay() !== 0 && dt.getDay() !== 6){
+        var k = iso(dt);
+        if(!state.days[k]) state.days[k] = { w: defW(), h: defH() };
+      }
     }
-    renderCal(); calc();
+    renderAll();
   });
   $('clearAll').addEventListener('click', function(){
-    state.selected = {}; state.excludedWeeks = {};
-    renderCal(); calc();
+    state.days = {}; state.excludedWeeks = {};
+    renderAll();
   });
 
-  var seg = $('wageMode').querySelectorAll('button');
-  for(var i=0; i<seg.length; i++){
-    seg[i].addEventListener('click', function(){
-      state.wageMode = this.getAttribute('data-m');
-      for(var j=0; j<seg.length; j++) seg[j].classList.remove('on');
-      this.classList.add('on');
-      $('dailyRow').style.display = state.wageMode === 'daily' ? '' : 'none';
-      $('hourlyRow').style.display = state.wageMode === 'hourly' ? '' : 'none';
-      calc();
-    });
-  }
-
-  ['dailyWage','hourlyWage','dailyHours'].forEach(function(id){
-    $(id).addEventListener('input', calc);
-    $(id).addEventListener('change', calc);
+  ['dailyWage','dailyHours'].forEach(function(id){
+    $(id).addEventListener('change', renderAll);
   });
 
   $('copyBtn').addEventListener('click', function(){
@@ -433,7 +488,7 @@
     setTimeout(function(){ toast.classList.remove('show'); }, 1500);
   });
 
-  renderCal(); calc();
+  renderAll();
 })();
 </script>
 </body>
