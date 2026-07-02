@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>일용직 급여 · 주휴수당 계산기</title>
+<style>
+  :root{
+    --bg:#f6f7f4;
+    --panel:#ffffff;
+    --ink:#1c2320;
+    --sub:#6b746e;
+    --line:#e2e6e0;
+    --accent:#0e6e5c;
+    --accent-soft:#e3f1ee;
+    --warn:#b4562a;
+    --warn-soft:#fbeee6;
+    --sun:#c0392b;
+    --sat:#2a5db0;
+    --num:'Segoe UI', Pretendard, sans-serif;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:Pretendard,'Noto Sans KR','Malgun Gothic','Apple SD Gothic Neo',sans-serif;
+    font-size:14px; line-height:1.5;
+  }
+  .wrap{max-width:1180px; margin:0 auto; padding:28px 20px 60px;}
+  header{display:flex; align-items:baseline; gap:12px; margin-bottom:20px; border-bottom:2px solid var(--ink); padding-bottom:14px;}
+  header h1{font-size:20px; font-weight:800; letter-spacing:-.02em;}
+  header .tag{font-size:12px; color:var(--sub);}
+  .grid{display:grid; grid-template-columns:330px 1fr; gap:18px; align-items:start;}
+  @media(max-width:900px){ .grid{grid-template-columns:1fr;} }
+
+  .panel{background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:18px;}
+  .panel h2{font-size:13px; font-weight:700; color:var(--accent); margin-bottom:12px; letter-spacing:.02em;}
+  .panel + .panel{margin-top:14px;}
+
+  label{display:block; font-size:12px; color:var(--sub); margin-bottom:4px;}
+  .row{margin-bottom:12px;}
+  input[type=number]{
+    width:100%; padding:9px 10px; border:1px solid var(--line); border-radius:7px;
+    font-size:14px; font-family:inherit; background:#fff;
+  }
+  input:focus{outline:2px solid var(--accent); outline-offset:0; border-color:var(--accent);}
+
+  .segment{display:flex; border:1px solid var(--line); border-radius:7px; overflow:hidden; margin-bottom:12px;}
+  .segment button{
+    flex:1; padding:8px 0; border:0; background:#fff; font-size:13px; cursor:pointer; color:var(--sub); font-family:inherit;
+  }
+  .segment button.on{background:var(--accent); color:#fff; font-weight:700;}
+  .hint{font-size:11.5px; color:var(--sub); margin-top:2px; line-height:1.45;}
+
+  /* 달력 */
+  .cal-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;}
+  .cal-head .month{font-size:17px; font-weight:800;}
+  .cal-head button{
+    border:1px solid var(--line); background:#fff; border-radius:7px; width:32px; height:32px;
+    cursor:pointer; font-size:15px; color:var(--ink);
+  }
+  .cal-head button:hover{border-color:var(--accent); color:var(--accent);}
+  table.cal{width:100%; border-collapse:collapse; table-layout:fixed;}
+  table.cal th{font-size:11.5px; color:var(--sub); font-weight:600; padding-bottom:8px;}
+  table.cal th.sun{color:var(--sun);} table.cal th.sat{color:var(--sat);}
+  table.cal td{padding:2px;}
+  .day{
+    width:100%; aspect-ratio:1.35; border:1px solid transparent; border-radius:8px;
+    background:transparent; cursor:pointer; font-size:13.5px; font-family:var(--num);
+    color:var(--ink); position:relative;
+  }
+  .day:hover{border-color:var(--accent);}
+  .day.other{color:#b9c0ba;}
+  .day.sun{color:var(--sun);} .day.sat{color:var(--sat);}
+  .day.other.sun, .day.other.sat{opacity:.45;}
+  .day.sel{background:var(--accent); color:#fff !important; font-weight:700;}
+  .day.sel::after{content:'근무'; display:block; font-size:9px; font-weight:500; opacity:.85;}
+  .cal-note{font-size:11.5px; color:var(--sub); margin-top:10px;}
+  .cal-actions{display:flex; gap:8px; margin-top:10px;}
+  .btn-sm{
+    border:1px solid var(--line); background:#fff; border-radius:7px; padding:6px 12px;
+    font-size:12px; cursor:pointer; color:var(--ink); font-family:inherit;
+  }
+  .btn-sm:hover{border-color:var(--accent); color:var(--accent);}
+
+  /* 주별 테이블 */
+  table.wk{width:100%; border-collapse:collapse; font-family:var(--num);}
+  table.wk th{
+    font-size:11.5px; color:var(--sub); font-weight:600; text-align:right;
+    padding:7px 8px; border-bottom:1.5px solid var(--ink);
+  }
+  table.wk th:first-child, table.wk td:first-child{text-align:left;}
+  table.wk td{padding:8px; border-bottom:1px solid var(--line); font-size:13px; text-align:right; white-space:nowrap;}
+  table.wk td .wkrange{font-size:11px; color:var(--sub);}
+  .badge{display:inline-block; font-size:10.5px; padding:2px 7px; border-radius:20px; font-weight:700;}
+  .badge.ok{background:var(--accent-soft); color:var(--accent);}
+  .badge.no{background:var(--warn-soft); color:var(--warn);}
+  td.excl{opacity:.45; text-decoration:line-through;}
+  .wk-toggle{cursor:pointer; accent-color:var(--accent); width:14px; height:14px;}
+
+  /* 합계 */
+  .sum{display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:10px; margin-top:16px;}
+  .sum .card{border:1px solid var(--line); border-radius:9px; padding:12px 14px; background:#fff;}
+  .sum .card .k{font-size:11.5px; color:var(--sub); margin-bottom:3px;}
+  .sum .card .v{font-size:17px; font-weight:800; font-family:var(--num); letter-spacing:-.01em;}
+  .sum .card.total{background:var(--accent); border-color:var(--accent);}
+  .sum .card.total .k{color:#cfe8e2;}
+  .sum .card.total .v{color:#fff; font-size:19px;}
+
+  .taxdetail{margin-top:14px; font-size:12.5px; color:var(--sub); line-height:1.7;
+    background:var(--accent-soft); border-radius:8px; padding:12px 14px;}
+  .taxdetail b{color:var(--ink);}
+
+  .copybar{display:flex; gap:8px; margin-top:16px;}
+  .btn{
+    border:0; background:var(--ink); color:#fff; border-radius:8px; padding:10px 18px;
+    font-size:13px; font-weight:700; cursor:pointer; font-family:inherit;
+  }
+  .btn.ghost{background:#fff; color:var(--ink); border:1px solid var(--line);}
+  .btn:hover{opacity:.88;}
+  .toast{
+    position:fixed; bottom:24px; left:50%; transform:translateX(-50%);
+    background:var(--ink); color:#fff; padding:10px 20px; border-radius:30px;
+    font-size:13px; opacity:0; transition:opacity .25s; pointer-events:none;
+  }
+  .toast.show{opacity:1;}
+
+  @media print{
+    body{background:#fff;}
+    .panel{border:none; padding:0;}
+    #settings, .copybar, .cal-actions, header .tag{display:none;}
+    .grid{grid-template-columns:1fr;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>일용직 급여 · 주휴수당 계산기</h1>
+    <span class="tag">달력에서 근무일을 클릭하면 주 단위(월~일)로 자동 계산됩니다</span>
+  </header>
+
+  <div class="grid">
+    <!-- ── 왼쪽: 설정 ── -->
+    <div>
+      <div class="panel" id="settings">
+        <h2>임금 조건</h2>
+        <div class="segment" id="wageMode">
+          <button data-m="daily" class="on">일당 입력</button>
+          <button data-m="hourly">시급 입력</button>
+        </div>
+        <div class="row" id="dailyRow">
+          <label>1일 일당 (원)</label>
+          <input type="number" id="dailyWage" value="150000" step="1000" min="0">
+        </div>
+        <div class="row" id="hourlyRow" style="display:none">
+          <label>시급 (원)</label>
+          <input type="number" id="hourlyWage" value="12000" step="100" min="0">
+        </div>
+        <div class="row">
+          <label>1일 소정근로시간 (시간)</label>
+          <input type="number" id="dailyHours" value="8" step="0.5" min="0" max="24">
+          <div class="hint">주휴수당 = min(주 근로시간, 40) ÷ 40 × 8 × 시급<br>주 15시간 미만인 주는 자동 제외됩니다.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 오른쪽: 달력 + 결과 ── -->
+    <div>
+      <div class="panel">
+        <div class="cal-head">
+          <button id="prevM">‹</button>
+          <div class="month" id="calTitle"></div>
+          <button id="nextM">›</button>
+        </div>
+        <table class="cal">
+          <thead><tr>
+            <th>월</th><th>화</th><th>수</th><th>목</th><th>금</th><th class="sat">토</th><th class="sun">일</th>
+          </tr></thead>
+          <tbody id="calBody"></tbody>
+        </table>
+        <div class="cal-note">※ 회색 날짜(이전·다음달)도 선택 가능 — 월 경계에 걸친 주의 근로시간을 정확히 반영하려면 함께 체크하세요. 주휴수당은 주휴일(일요일)이 속한 달로 귀속됩니다.</div>
+        <div class="cal-actions">
+          <button class="btn-sm" id="selWeekdays">이번달 평일 전체 선택</button>
+          <button class="btn-sm" id="clearAll">전체 해제</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>주별 계산 내역</h2>
+        <table class="wk">
+          <thead><tr>
+            <th>주 (월~일)</th><th>근무일</th><th>주 근로시간</th><th>주휴 요건</th><th>임금</th><th>주휴수당</th><th>포함</th>
+          </tr></thead>
+          <tbody id="wkBody"></tbody>
+        </table>
+        <div class="hint" style="margin-top:8px">‘포함’ 체크를 해제하면 해당 주의 주휴수당을 제외합니다 (결근 등 개근 요건 미충족 시).</div>
+
+        <div class="sum" id="sumArea"></div>
+        <div class="taxdetail" id="taxDetail"></div>
+
+        <div class="copybar">
+          <button class="btn" id="copyBtn">결과 텍스트 복사</button>
+          <button class="btn ghost" onclick="window.print()">인쇄</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast">복사되었습니다</div>
+
+<script>
+(function(){
+  var state = {
+    year: new Date().getFullYear(),
+    month: new Date().getMonth(),
+    selected: {},
+    excludedWeeks: {},
+    wageMode: 'daily'
+  };
+
+  var $ = function(id){ return document.getElementById(id); };
+  var fmt = function(n){ return Math.round(n).toLocaleString('ko-KR'); };
+
+  function iso(d){
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  }
+  function fromIso(s){
+    var p = s.split('-');
+    return new Date(+p[0], +p[1]-1, +p[2]);
+  }
+  function mondayOf(d){
+    var day = d.getDay();
+    var diff = (day === 0) ? -6 : 1 - day;
+    var m = new Date(d);
+    m.setDate(d.getDate() + diff);
+    return m;
+  }
+
+  function hourly(){
+    var h = parseFloat($('dailyHours').value) || 8;
+    if(state.wageMode === 'daily'){
+      var dw = parseFloat($('dailyWage').value) || 0;
+      return h > 0 ? dw / h : 0;
+    }
+    return parseFloat($('hourlyWage').value) || 0;
+  }
+  function dailyWage(){
+    var h = parseFloat($('dailyHours').value) || 8;
+    if(state.wageMode === 'daily') return parseFloat($('dailyWage').value) || 0;
+    return (parseFloat($('hourlyWage').value) || 0) * h;
+  }
+
+  /* ── 달력 렌더 ── */
+  function renderCal(){
+    $('calTitle').textContent = state.year + '년 ' + (state.month+1) + '월';
+    var first = new Date(state.year, state.month, 1);
+    var start = mondayOf(first);
+    var html = '';
+    var cur = new Date(start);
+    for(var w=0; w<6; w++){
+      var row = '<tr>';
+      var hasThisMonth = false;
+      var cells = '';
+      for(var i=0; i<7; i++){
+        var inMonth = cur.getMonth() === state.month;
+        if(inMonth) hasThisMonth = true;
+        var key = iso(cur);
+        var cls = 'day';
+        if(!inMonth) cls += ' other';
+        if(cur.getDay() === 0) cls += ' sun';
+        if(cur.getDay() === 6) cls += ' sat';
+        if(state.selected[key]) cls += ' sel';
+        cells += '<td><button class="'+cls+'" data-d="'+key+'">'+cur.getDate()+'</button></td>';
+        cur.setDate(cur.getDate()+1);
+      }
+      row += cells + '</tr>';
+      if(hasThisMonth) html += row;
+    }
+    $('calBody').innerHTML = html;
+    var btns = $('calBody').querySelectorAll('.day');
+    for(var j=0; j<btns.length; j++){
+      btns[j].addEventListener('click', function(){
+        var k = this.getAttribute('data-d');
+        if(state.selected[k]) delete state.selected[k];
+        else state.selected[k] = true;
+        renderCal(); calc();
+      });
+    }
+  }
+
+  /* ── 계산 ── */
+  function calc(){
+    var hrs = parseFloat($('dailyHours').value) || 8;
+    var hw = hourly();
+    var dw = dailyWage();
+
+    var weeks = {};
+    var dates = Object.keys(state.selected).sort();
+    dates.forEach(function(k){
+      var d = fromIso(k);
+      var wk = iso(mondayOf(d));
+      if(!weeks[wk]) weeks[wk] = [];
+      weeks[wk].push(k);
+    });
+
+    var wkKeys = Object.keys(weeks).sort();
+    var rows = '';
+    var totWage = 0, totJuhyu = 0;
+
+    var curY = state.year, curM = state.month;
+    function inCurMonth(d){ return d.getFullYear() === curY && d.getMonth() === curM; }
+    function monthDaysCount(days){
+      return days.filter(function(k){ return inCurMonth(fromIso(k)); }).length;
+    }
+
+    wkKeys.forEach(function(wk){
+      var days = weeks[wk];
+      var mon = fromIso(wk);
+      var sun = new Date(mon); sun.setDate(mon.getDate()+6);
+      var weekHours = days.length * hrs;
+      var eligible = weekHours >= 15;
+      var excluded = !!state.excludedWeeks[wk];
+      var juhyu = 0;
+      if(eligible && !excluded){
+        juhyu = Math.round(Math.min(weekHours, 40) / 40 * 8 * hw);
+      }
+      var juhyuBelongs = inCurMonth(sun);
+      var mCount = monthDaysCount(days);
+      var wage = mCount * dw;
+
+      totWage += wage;
+      if(juhyuBelongs) totJuhyu += juhyu;
+
+      var range = (mon.getMonth()+1)+'/'+mon.getDate()+' ~ '+(sun.getMonth()+1)+'/'+sun.getDate();
+      rows += '<tr>'
+        + '<td><span class="wkrange">'+range+'</span></td>'
+        + '<td>'+days.length+'일</td>'
+        + '<td>'+weekHours+'h</td>'
+        + '<td>'+(eligible ? '<span class="badge ok">15h 이상</span>' : '<span class="badge no">15h 미만</span>')+'</td>'
+        + '<td>'+fmt(wage)+(days.length !== mCount ? ' <span class="wkrange">(당월분)</span>' : '')+'</td>'
+        + '<td class="'+(excluded?'excl':'')+'">'+ (eligible ? fmt(juhyu)+(juhyuBelongs?'':' <span class="wkrange">(익월귀속)</span>') : '—') +'</td>'
+        + '<td><input type="checkbox" class="wk-toggle" data-wk="'+wk+'" '+(excluded?'':'checked')+' '+(eligible?'':'disabled')+'></td>'
+        + '</tr>';
+    });
+
+    $('wkBody').innerHTML = rows || '<tr><td colspan="7" style="text-align:center;color:var(--sub);padding:20px">달력에서 근무일을 선택하세요</td></tr>';
+    var toggles = $('wkBody').querySelectorAll('.wk-toggle');
+    for(var t=0; t<toggles.length; t++){
+      toggles[t].addEventListener('change', function(){
+        var k = this.getAttribute('data-wk');
+        if(this.checked) delete state.excludedWeeks[k];
+        else state.excludedWeeks[k] = true;
+        calc();
+      });
+    }
+
+    var gross = totWage + totJuhyu;
+    var curCount = dates.filter(function(k){ return inCurMonth(fromIso(k)); }).length;
+
+    var s = '';
+    s += card('근무일수 (당월)', curCount + '일');
+    s += card('일당 합계', fmt(totWage) + '원');
+    s += card('주휴수당 합계', fmt(totJuhyu) + '원');
+    s += '<div class="card total"><div class="k">총 지급액</div><div class="v">' + fmt(gross) + '원</div></div>';
+    $('sumArea').innerHTML = s;
+
+    $('taxDetail').innerHTML =
+      '<b>주휴수당</b> : min(주 근로시간, 40) ÷ 40 × 8 × 시급 ' + fmt(hw) + '원 · 주 15시간 미만 주 제외 · 일요일 기준 당월 귀속';
+
+    state.copyText = [
+      '[' + state.year + '년 ' + (state.month+1) + '월 일용직 급여]',
+      '· 근무일수 : ' + curCount + '일',
+      '· 일당 합계 : ' + fmt(totWage) + '원',
+      '· 주휴수당 : ' + fmt(totJuhyu) + '원',
+      '· 총 지급액 : ' + fmt(gross) + '원'
+    ].join('\n');
+  }
+
+  function card(k, v){
+    return '<div class="card"><div class="k">'+k+'</div><div class="v">'+v+'</div></div>';
+  }
+
+  /* ── 이벤트 ── */
+  $('prevM').addEventListener('click', function(){
+    state.month--; if(state.month < 0){ state.month = 11; state.year--; }
+    renderCal(); calc();
+  });
+  $('nextM').addEventListener('click', function(){
+    state.month++; if(state.month > 11){ state.month = 0; state.year++; }
+    renderCal(); calc();
+  });
+  $('selWeekdays').addEventListener('click', function(){
+    var last = new Date(state.year, state.month+1, 0).getDate();
+    for(var d=1; d<=last; d++){
+      var dt = new Date(state.year, state.month, d);
+      if(dt.getDay() !== 0 && dt.getDay() !== 6) state.selected[iso(dt)] = true;
+    }
+    renderCal(); calc();
+  });
+  $('clearAll').addEventListener('click', function(){
+    state.selected = {}; state.excludedWeeks = {};
+    renderCal(); calc();
+  });
+
+  var seg = $('wageMode').querySelectorAll('button');
+  for(var i=0; i<seg.length; i++){
+    seg[i].addEventListener('click', function(){
+      state.wageMode = this.getAttribute('data-m');
+      for(var j=0; j<seg.length; j++) seg[j].classList.remove('on');
+      this.classList.add('on');
+      $('dailyRow').style.display = state.wageMode === 'daily' ? '' : 'none';
+      $('hourlyRow').style.display = state.wageMode === 'hourly' ? '' : 'none';
+      calc();
+    });
+  }
+
+  ['dailyWage','hourlyWage','dailyHours'].forEach(function(id){
+    $(id).addEventListener('input', calc);
+    $(id).addEventListener('change', calc);
+  });
+
+  $('copyBtn').addEventListener('click', function(){
+    var t = state.copyText || '';
+    var ta = document.createElement('textarea');
+    ta.value = t; document.body.appendChild(ta);
+    ta.select();
+    try{ document.execCommand('copy'); }catch(e){}
+    document.body.removeChild(ta);
+    if(navigator.clipboard){ navigator.clipboard.writeText(t).catch(function(){}); }
+    var toast = $('toast');
+    toast.classList.add('show');
+    setTimeout(function(){ toast.classList.remove('show'); }, 1500);
+  });
+
+  renderCal(); calc();
+})();
+</script>
+</body>
+</html>
